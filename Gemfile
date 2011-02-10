@@ -9,5 +9,12 @@ group :development do
   gem "shoulda", ">= 0"
   gem "bundler", "~> 1.0.0"
   gem "jeweler", "~> 1.5.2"
-  gem "rcov", ">= 0"
+  gem "relevance-rcov", ">= 0"
+  gem "thin"
+  gem "eventmachine"
+  gem "sinatra"
+  gem "async-sinatra"
+  gem "sinatra-reloader"
+  gem "mongo"
+  gem "activerecord"
 end
