@@ -3,10 +3,9 @@ require 'singleton'
 module ProtonStream
   
   class FileAudioQueue
-    include EventMachine::Deferrable
     include Singleton
     
-    attr_accessor :buffer_file   
+    attr_accessor :buffer_file
     
     BIT_RATE = 80
     BLOCK_SIZE = 1024 * BIT_RATE
@@ -16,17 +15,13 @@ module ProtonStream
     # appending bytes to the audio queue
     #
     def initialize
-      
-      puts "Initialising queue: buffer max #{MAX_BUFFER_SIZE} #{BIT_RATE}kbs"
-      
       self.buffer_file = File.new("/tmp/buffer", "w+")
       @@current_track = Track.next_track
-      @@already_read = 0
-      
+      @@already_read = 0      
       @@head = 0
       @@tail = 0
       
-      # Fill the buffer to start with
+      # Fill the buffer to start off with
       append_queue
       
       # Periodically append more music to the queue      
@@ -39,69 +34,16 @@ module ProtonStream
       EM.add_periodic_timer(1) do
         read_chunk
       end
+      
+      puts "Initialised queue: buffer max #{MAX_BUFFER_SIZE} #{BIT_RATE}kbs"
     end
     
-    # Called by Rack to stream bytes 
-    #
-    def each
-      # The callback procs will use the value of p when they are defined      
-      p = @@head
-      
-      stream_writer = proc do 
-        # wait until the another timer has updated the bytes and moved the head
-        until(@@head != p) do
-          sleep 0.5
-        end
-        
-        # All the listeners get the same data
-        bytes = @@last_chunk
-        
-        unless bytes.nil? or bytes.size == 0
-          yield bytes
-          #yield "head pointer = #{@@head}<br/>"
-          #puts "Streaming #{bytes.size} bytes  pos=#{@@head}"
-        end
-      end
-      
-      end_of_write_callback = proc do
-        # Update the current position
-        p = @@head
-        # Recursively call another deferrable to perpetually stream bytes
-        EM.defer(stream_writer, end_of_write_callback)
-      end
-      
-      # Kick-off the initial deferrable
-      EM.defer(stream_writer, end_of_write_callback)
+    def head
+      @@head
     end
-    
-    # Calculates the number of bytes in the buffer that can be safely written
-    # to, without over-writing queued data
-    #
-    def free_space
-      buffer_file_size = File.size(buffer_file)
-      free_space = 0
-      
-      if buffer_file_size < MAX_BUFFER_SIZE
-        # We haven't yet filled the buffer
-        free_space = MAX_BUFFER_SIZE - buffer_file_size
-      else
-        # The free space is the difference between the tail and the head        
-        if @@head > @@tail
-          free_space = @@head - @@tail
-        elsif @@head == @@tail
-          free_space = 0
-        else
-          free_space = (MAX_BUFFER_SIZE - @@tail) + @@head
-        end
-      end
-      
-      puts "free space = #{free_space} tail = #{@@tail} head = #{@@head}"
-      return free_space
-    end
-    
-    # Returns the number of blocks there are based on the bit rate
-    def free_blocks
-      free_space / BLOCK_SIZE
+     
+    def last_chunk
+      @@last_chunk
     end
     
     # ==========================================================================
@@ -111,27 +53,27 @@ module ProtonStream
     #
     def append_queue
       if free_space > 0
-        puts "reading #{@@current_track} into buffer"
+        #puts "reading #{@@current_track} into buffer"
         @db = Mongo::Connection.new.db("mostrated")
         @fs = Mongo::GridFileSystem.new(@db) 
         
         track = @fs.open(@@current_track, "r")     
         
-        puts "#{free_blocks} free blocks"
+        #puts "#{free_blocks} free blocks"
         free_blocks.times {           
           if @@already_read < track.file_length
             buffer_block track
           else
             # We've read until until the end of a track, time for another one
-            puts '=' * 25
+            #puts '=' * 25
             @@current_track = Track.next_track
             @@already_read = 0
             return
           end
         }
-        puts "buffer size: #{File.size(buffer_file)} / #{free_space} free"
+        #puts "buffer size: #{File.size(buffer_file)} / #{free_space} free"
       else
-        puts "Buffer full"        
+        #puts "Buffer full"        
       end
     end
     
@@ -140,7 +82,7 @@ module ProtonStream
     # without manipulting the pointers
     #
     def read_chunk
-      puts("Reading #{BLOCK_SIZE} bytes from offset #{@@head}")
+      #puts("Reading #{BLOCK_SIZE} bytes from offset #{@@head}")
       
       # Read a block relative to the head pointer offset
       @@last_chunk = File.read(buffer_file.path, BLOCK_SIZE, @@head)
@@ -173,7 +115,7 @@ module ProtonStream
       end
       
       # Write the bytes to the end of the queue
-      puts "Writing #{BLOCK_SIZE} from track pos #{@@already_read} to buffer pos #{@@tail}"
+      #puts "Writing #{BLOCK_SIZE} from track pos #{@@already_read} to buffer pos #{@@tail}"
       buffer_file.write bytes
       
       # If we've reached the end of the buffer, wrap around to the front
@@ -185,6 +127,36 @@ module ProtonStream
       
       # Remember how far into the track we have already read onto the queue
       @@already_read += BLOCK_SIZE
+    end
+    
+    # Calculates the number of bytes in the buffer that can be safely written
+    # to, without over-writing queued data
+    #
+    def free_space
+      buffer_file_size = File.size(buffer_file)
+      free_space = 0
+      
+      if buffer_file_size < MAX_BUFFER_SIZE
+        # We haven't yet filled the buffer
+        free_space = MAX_BUFFER_SIZE - buffer_file_size
+      else
+        # The free space is the difference between the tail and the head        
+        if @@head > @@tail
+          free_space = @@head - @@tail
+        elsif @@head == @@tail
+          free_space = 0
+        else
+          free_space = (MAX_BUFFER_SIZE - @@tail) + @@head
+        end
+      end
+      
+      #puts "free space = #{free_space} tail = #{@@tail} head = #{@@head}"
+      return free_space
+    end   
+    
+    # Returns the number of blocks there are based on the bit rate
+    def free_blocks
+      free_space / BLOCK_SIZE
     end
     
   end

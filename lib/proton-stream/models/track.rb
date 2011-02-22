@@ -1,4 +1,4 @@
-class Track < ActiveRecord::Base
+class Track
   
   #attr_accessor :bytes_read
   @@count = 0
@@ -16,7 +16,7 @@ class Track < ActiveRecord::Base
     
     @@count += 1
     
-    STDOUT.puts file + " #{@@count}"
+    #STDOUT.puts file + " #{@@count}"
     return file
     
     

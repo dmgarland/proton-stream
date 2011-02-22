@@ -1,17 +1,16 @@
-require 'rubygems'
 require 'sinatra'
 require 'mongo'
 require 'eventmachine'
-require 'active_record'
-#require 'sinatra/async'
 require 'sinatra/reloader' if development?
 
 require 'lib/audio_queue'
 require 'lib/file_audio_queue'
+require 'lib/response_body'
 require 'lib/proton-stream/models/track'
 
 class ProtonServer < Sinatra::Base
-  # register Sinatra::Async
+  
+  include ProtonStream
   
   @@buffer = nil
   @@empty_rack_response = [-1, {}, []].freeze
@@ -26,21 +25,17 @@ class ProtonServer < Sinatra::Base
       until EM.reactor_running?
         sleep 1
       end
-      @@buffer = ProtonStream::FileAudioQueue.instance if @@buffer.nil? 
-
+      
+      # Create a singleton instance of a file-backed audio queue
+      # which automatically starts buffering content
+      @@buffer = FileAudioQueue.instance if @@buffer.nil?
     end
-    
-    # Establish a connection to the database
-    # ActiveRecord::Base.establish_connection(
-    # :adapter => 'sqlite3',
-    # :database =>  "db/dev.sqlite3"
-    # )
   end
   
   get '/play' do
 
     EM.next_tick do
-      request.env['async.callback'].call [200, @@mp3_mime_type, @@buffer]
+      request.env['async.callback'].call [200, @@mp3_mime_type, ResponseBody.new]
     end
     
     @@empty_rack_response    
