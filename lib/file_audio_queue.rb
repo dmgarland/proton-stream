@@ -8,15 +8,16 @@ module ProtonStream
     
     attr_accessor :buffer_file   
     
-    BLOCK_SIZE = 1024 * 96
-    MAX_BUFFER_SIZE = 20 * BLOCK_SIZE
+    BIT_RATE = 80
+    BLOCK_SIZE = 1024 * BIT_RATE
+    MAX_BUFFER_SIZE = 10 * BLOCK_SIZE
     
     # Adds a periodic timer to the Eventmachine reactor loop and starts 
     # appending bytes to the audio queue
     #
     def initialize
       
-      puts "Initialising queue"
+      puts "Initialising queue: buffer max #{MAX_BUFFER_SIZE} #{BIT_RATE}kbs"
       
       self.buffer_file = File.new("/tmp/buffer", "w+")
       @@current_track = Track.next_track
@@ -29,7 +30,7 @@ module ProtonStream
       append_queue
       
       # Periodically append more music to the queue      
-      EM.add_periodic_timer(5) do
+      EM.add_periodic_timer(3) do
         append_queue
       end
       
@@ -47,8 +48,6 @@ module ProtonStream
       p = @@head
       
       stream_writer = proc do 
-        #puts "stream writer #{p}"
-        
         # wait until the another timer has updated the bytes and moved the head
         until(@@head != p) do
           sleep 0.5
@@ -60,22 +59,24 @@ module ProtonStream
         unless bytes.nil? or bytes.size == 0
           yield bytes
           #yield "head pointer = #{@@head}<br/>"
-          #puts "Wrote #{bytes.size} bytes  pos=#{@@head}"
-        else
-          #puts "no bytes pos=#{@@head}"
+          #puts "Streaming #{bytes.size} bytes  pos=#{@@head}"
         end
       end
       
       end_of_write_callback = proc do
-        #puts "end of write callbcak"
         # Update the current position
         p = @@head
+        # Recursively call another deferrable to perpetually stream bytes
         EM.defer(stream_writer, end_of_write_callback)
       end
       
+      # Kick-off the initial deferrable
       EM.defer(stream_writer, end_of_write_callback)
     end
     
+    # Calculates the number of bytes in the buffer that can be safely written
+    # to, without over-writing queued data
+    #
     def free_space
       buffer_file_size = File.size(buffer_file)
       free_space = 0
@@ -84,8 +85,7 @@ module ProtonStream
         # We haven't yet filled the buffer
         free_space = MAX_BUFFER_SIZE - buffer_file_size
       else
-        # The free space is the difference between the tail and the head
-        
+        # The free space is the difference between the tail and the head        
         if @@head > @@tail
           free_space = @@head - @@tail
         elsif @@head == @@tail
@@ -99,10 +99,12 @@ module ProtonStream
       return free_space
     end
     
+    # Returns the number of blocks there are based on the bit rate
     def free_blocks
       free_space / BLOCK_SIZE
     end
     
+    # ==========================================================================
     private
     
     # Gets the next track from Mongo and appends its data to the buffer.
@@ -115,25 +117,18 @@ module ProtonStream
         
         track = @fs.open(@@current_track, "r")     
         
-        if track.file_length > free_space
-          # The file is too big to read into the buffer, so read up until
-          # the free space is used
-          puts "#{free_blocks} free blocks"
-          free_blocks.times {
-            puts "Writing #{BLOCK_SIZE} from track pos #{track.tell} to buffer pos #{@@tail}"
-            if @@already_read < track.file_length
-              buffer_block track
-            else
-              # We've read until until the end of a track, time for another one
-              @@current_track = Track.next_track
-              @@already_read = 0
-            end
-          }
-        else
-          # We can completely read the file into the buffer
-          buffer_file << track.read
-          @@already_read = 0
-        end
+        puts "#{free_blocks} free blocks"
+        free_blocks.times {           
+          if @@already_read < track.file_length
+            buffer_block track
+          else
+            # We've read until until the end of a track, time for another one
+            puts '=' * 25
+            @@current_track = Track.next_track
+            @@already_read = 0
+            return
+          end
+        }
         puts "buffer size: #{File.size(buffer_file)} / #{free_space} free"
       else
         puts "Buffer full"        
@@ -141,8 +136,8 @@ module ProtonStream
     end
     
     # Read a chunk of bytes from the head of the buffer and store it in a 
-    # class variable, so that every listening client receives the same data
-    # and doesn't mess up the pointers
+    # class variable, so that every listening client can access the same data
+    # without manipulting the pointers
     #
     def read_chunk
       puts("Reading #{BLOCK_SIZE} bytes from offset #{@@head}")
@@ -152,16 +147,34 @@ module ProtonStream
       @@head += BLOCK_SIZE
       
       # If we've read to the end, loop around to the start
-      if @@head > File.size(buffer_file)
+      if @@head >= File.size(buffer_file)
         @@head = 0
       end        
     end
-
+    
+    # Writes a block from the mongo track handle to the buffer, allowing for
+    # wrap-arounds if we've hit the end of the buffer.
+    #
     def buffer_block(track)
+      # Seek to the relevant points in the track
       track.seek @@already_read
-      buffer_file.seek @@tail 
-      bytes = track.read(BLOCK_SIZE)       
-      buffer_file.write bytes     
+      # Seek to the tail of the buffer
+      buffer_file.seek @@tail       
+      # Read a block
+      bytes = track.read(BLOCK_SIZE)
+      
+      # If we've reached the end of a track, and don't have enough bytes to fill
+      # up a block, we need to pad the rest of the block with zeros to ensure
+      # that whatever was previsouly in the block gets wiped, otherwise we'll
+      # hear memories from the previous audio in the queue...
+      if bytes.size < BLOCK_SIZE        
+        padding = "\000" * (BLOCK_SIZE - bytes.size)
+        bytes.concat(padding)
+      end
+      
+      # Write the bytes to the end of the queue
+      puts "Writing #{BLOCK_SIZE} from track pos #{@@already_read} to buffer pos #{@@tail}"
+      buffer_file.write bytes
       
       # If we've reached the end of the buffer, wrap around to the front
       if buffer_file.tell >= MAX_BUFFER_SIZE
@@ -170,6 +183,7 @@ module ProtonStream
         @@tail += BLOCK_SIZE
       end
       
+      # Remember how far into the track we have already read onto the queue
       @@already_read += BLOCK_SIZE
     end
     

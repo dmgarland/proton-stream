@@ -9,7 +9,7 @@ class Track < ActiveRecord::Base
     # Track selection will be more compilcated than this...
     file = ""
     if @@count % 2 == 0
-      file = "/home/daniel/Music/grade 8/PF_G8_A1_J_S_Bach_Capriccio.mp3"      
+      file = "bach.mp3"      
     else
       file = "mindfield.mp3"
     end
