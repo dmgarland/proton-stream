@@ -41,7 +41,7 @@ module ProtonStream
     def head
       @@head
     end
-     
+    
     def last_chunk
       @@last_chunk
     end
@@ -52,19 +52,16 @@ module ProtonStream
     # Gets the next track from Mongo and appends its data to the buffer.
     #
     def append_queue
-      if free_space > 0
-
+      if free_space > 0        
         free_blocks.times {           
           if @@already_read < @@current_track.file.size
             buffer_block @@current_track
           else
-            # We've read until until the end of a track, time for another one
-            @@current_track = Track.next_track(@@current_track._id)
-            @@already_read = 0
+            # We've finished this track, on to the next one
+            load_next_track
             return
           end
         }
-        #puts "buffer size: #{File.size(buffer_file)} / #{free_space} free"
       else
         #puts "Buffer full"        
       end
@@ -91,35 +88,43 @@ module ProtonStream
     # wrap-arounds if we've hit the end of the buffer.
     #
     def buffer_block(track)
-      # Seek to the relevant points in the track
-      track.file.seek @@already_read
-      # Seek to the tail of the buffer
-      buffer_file.seek @@tail       
-      # Read a block
-      bytes = track.file.read(BLOCK_SIZE)
-      
-      # If we've reached the end of a track, and don't have enough bytes to fill
-      # up a block, we need to pad the rest of the block with zeros to ensure
-      # that whatever was previsouly in the block gets wiped, otherwise we'll
-      # hear memories from the previous audio in the queue...
-      if bytes.size < BLOCK_SIZE        
-        padding = "\000" * (BLOCK_SIZE - bytes.size)
-        bytes.concat(padding)
+      begin
+        # Seek to the relevant points in the track
+        track.file.seek @@already_read
+        
+        # Seek to the tail of the buffer
+        buffer_file.seek @@tail       
+        # Read a block
+        bytes = track.file.read(BLOCK_SIZE)
+        
+        # If we've reached the end of a track, and don't have enough bytes to fill
+        # up a block, we need to pad the rest of the block with zeros to ensure
+        # that whatever was previsouly in the block gets wiped, otherwise we'll
+        # hear memories from the previous audio in the queue...
+        if bytes.size < BLOCK_SIZE        
+          padding = "\000" * (BLOCK_SIZE - bytes.size)
+          bytes.concat(padding)
+        end
+        
+        # Write the bytes to the end of the queue
+        #puts "Writing #{BLOCK_SIZE} from track pos #{@@already_read} to buffer pos #{@@tail}"
+        buffer_file.write bytes
+        
+        # If we've reached the end of the buffer, wrap around to the front
+        if buffer_file.tell >= MAX_BUFFER_SIZE
+          @@tail = 0
+        else
+          @@tail += BLOCK_SIZE
+        end
+        
+        # Remember how far into the track we have already read onto the queue
+        @@already_read += BLOCK_SIZE
+        
+      rescue Exception => e
+        puts e
+        # So somethings wrong with that track, go find another one...
+        buffer_block load_next_track
       end
-      
-      # Write the bytes to the end of the queue
-      #puts "Writing #{BLOCK_SIZE} from track pos #{@@already_read} to buffer pos #{@@tail}"
-      buffer_file.write bytes
-      
-      # If we've reached the end of the buffer, wrap around to the front
-      if buffer_file.tell >= MAX_BUFFER_SIZE
-        @@tail = 0
-      else
-        @@tail += BLOCK_SIZE
-      end
-      
-      # Remember how far into the track we have already read onto the queue
-      @@already_read += BLOCK_SIZE
     end
     
     # Calculates the number of bytes in the buffer that can be safely written
@@ -145,6 +150,12 @@ module ProtonStream
       
       return free_space
     end   
+    
+    # Loads the next track and updates pointers
+    def load_next_track
+      @@already_read = 0
+      @@current_track = Track.next_track(@@current_track._id)      
+    end
     
     # Returns the number of blocks there are based on the bit rate
     def free_blocks
