@@ -59,7 +59,7 @@ module ProtonStream
             buffer_block @@current_track
           else
             # We've read until until the end of a track, time for another one
-            @@current_track = Track.next_track
+            @@current_track = Track.next_track(@@current_track._id)
             @@already_read = 0
             return
           end

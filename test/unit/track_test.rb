@@ -10,7 +10,7 @@ class TrackTest < Test::Unit::TestCase
     should "be able to return a random track" do      
       track_one = Track.next_track
       assert_not_nil track_one      
-      assert_not_equal track_one, Track.next_track
+      assert_not_equal track_one, Track.next_track(track_one._id)
     end
   end
   

@@ -30,7 +30,12 @@ class ProtonServer < Sinatra::Base
       
       # Mongo DB
       MongoMapper.database = "mostrated_#{Sinatra::Application.environment.to_s}"
-     # Track.ensureIndex("random")
+      # Track.ensureIndex("random")
+      # Track.ensureIndex("_id")
+      
+      Dir.glob("/home/daniel/Music/grade\ 8/*160bpm.mp3").each do |mp3|
+        Track.create(:title => mp3, :random => rand(100000).to_i, :file => File.new(mp3))
+      end
       
       # Create a singleton instance of a file-backed audio queue
       # which automatically starts buffering content

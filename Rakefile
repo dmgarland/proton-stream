@@ -51,3 +51,8 @@ Rake::RDocTask.new do |rdoc|
   rdoc.rdoc_files.include('README*')
   rdoc.rdoc_files.include('lib/**/*.rb')
 end
+
+# TODO: Make this a seed task?
+# Dir.glob("/home/daniel/Music/grade\ 8/*160bpm.mp3").each do |mp3|
+#        Track.create(:title => mp3, :random => rand(100000).to_i, :file => File.new(mp3))
+#     end
