@@ -53,19 +53,12 @@ module ProtonStream
     #
     def append_queue
       if free_space > 0
-        #puts "reading #{@@current_track} into buffer"
-        @db = Mongo::Connection.new.db("mostrated")
-        @fs = Mongo::GridFileSystem.new(@db) 
-        
-        track = @fs.open(@@current_track, "r")     
-        
-        #puts "#{free_blocks} free blocks"
+
         free_blocks.times {           
-          if @@already_read < track.file_length
-            buffer_block track
+          if @@already_read < @@current_track.file.size
+            buffer_block @@current_track
           else
             # We've read until until the end of a track, time for another one
-            #puts '=' * 25
             @@current_track = Track.next_track
             @@already_read = 0
             return
@@ -99,11 +92,11 @@ module ProtonStream
     #
     def buffer_block(track)
       # Seek to the relevant points in the track
-      track.seek @@already_read
+      track.file.seek @@already_read
       # Seek to the tail of the buffer
       buffer_file.seek @@tail       
       # Read a block
-      bytes = track.read(BLOCK_SIZE)
+      bytes = track.file.read(BLOCK_SIZE)
       
       # If we've reached the end of a track, and don't have enough bytes to fill
       # up a block, we need to pad the rest of the block with zeros to ensure
@@ -130,7 +123,7 @@ module ProtonStream
     end
     
     # Calculates the number of bytes in the buffer that can be safely written
-    # to, without over-writing queued data
+    # without over-writing queued data
     #
     def free_space
       buffer_file_size = File.size(buffer_file)
@@ -150,7 +143,6 @@ module ProtonStream
         end
       end
       
-      #puts "free space = #{free_space} tail = #{@@tail} head = #{@@head}"
       return free_space
     end   
     
