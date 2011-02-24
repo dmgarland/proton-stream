@@ -1,10 +1,9 @@
-require 'sinatra'
+require 'sinatra/base'
+require 'sinatra/reloader'
+require 'eventmachine'
 require 'mongo'
 require 'mongo_mapper'
 require 'joint'
-require 'eventmachine'
-require 'sinatra/reloader' if development?
-require 'ruby-debug' if development?
 
 require 'lib/file_audio_queue'
 require 'lib/response_body'
@@ -19,6 +18,12 @@ class ProtonServer < Sinatra::Base
   @@ogg_mime_type = {'Content-Type' => 'application/ogg'}.freeze
   @@mp3_mime_type = {'Content-Type' => 'audio/mpeg'}.freeze
   @@html_mime_type = {'Content-Type' => 'text/html'}.freeze 
+  
+  # Reload app classes and templates in development
+  configure(:development) do
+    require 'ruby-debug'
+    register Sinatra::Reloader    
+  end
   
   # Starts the EventMachine timers
   #
@@ -40,7 +45,7 @@ class ProtonServer < Sinatra::Base
   end
   
   get '/play.mp3' do
-
+    
     EM.next_tick do
       request.env['async.callback'].call [200, @@mp3_mime_type, ResponseBody.new]
     end
@@ -48,5 +53,8 @@ class ProtonServer < Sinatra::Base
     @@keep_alive    
   end
   
+  get '/current_track' do
+    @@buffer.current_track.to_json
+  end
+  
 end
- 

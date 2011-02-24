@@ -46,6 +46,10 @@ module ProtonStream
       @@last_chunk
     end
     
+    def current_track
+      @@current_track
+    end
+    
     # ==========================================================================
     private
     

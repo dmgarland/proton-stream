@@ -1,6 +1,7 @@
 = proton-stream
 
-Description goes here.
+Running in development mode:
+thin -R lib/proton-stream/config.ru
 
 == Contributing to proton-stream
  
