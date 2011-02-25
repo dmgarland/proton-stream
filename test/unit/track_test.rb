@@ -34,6 +34,10 @@ class TrackTest < Test::Unit::TestCase
       assert_stored_file @track      
     end
     
+    should "generate only relevant json" do
+      assert_equal "{\"title\":\"corporis neque dolorum\"}", @track.to_json
+    end
+    
     teardown do
       FileUtils.rm_f 'somefile.mp3' if File.exist? 'somefile.mp3'
     end

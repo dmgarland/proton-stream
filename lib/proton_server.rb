@@ -53,7 +53,8 @@ class ProtonServer < Sinatra::Base
     @@keep_alive    
   end
   
-  get '/current_track' do
+  get '/current_track.json' do
+    content_type :json
     @@buffer.current_track.to_json
   end
   

@@ -15,4 +15,10 @@ class Track
     return track
   end
   
+  def to_json(*a)
+    { 
+      :title => title 
+    }.to_json(*a)
+  end
+  
 end
