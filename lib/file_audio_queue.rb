@@ -7,6 +7,7 @@ module ProtonStream
     
     attr_accessor :buffer_file
     attr_accessor :current_track
+    attr_accessor :already_read
     
     BIT_RATE = 80
     BLOCK_SIZE = 1024 * BIT_RATE
@@ -18,7 +19,7 @@ module ProtonStream
     def initialize
       self.buffer_file = File.new("/tmp/buffer", "w+")
       self.current_track = Track.next_track
-      @@already_read = 0      
+      self.already_read = 0      
       @@head = 0
       @@tail = 0
       
@@ -55,7 +56,7 @@ module ProtonStream
     def append_queue
       if free_space > 0        
         free_blocks.times {           
-          if @@already_read < current_track.file.size
+          if already_read < current_track.file.size
             buffer_block current_track
           else
             # We've finished this track, on to the next one
@@ -91,7 +92,7 @@ module ProtonStream
     def buffer_block(track)
       begin
         # Seek to the relevant points in the track
-        track.file.seek @@already_read
+        track.file.seek self.already_read
         
         # Seek to the tail of the buffer
         buffer_file.seek @@tail       
@@ -108,7 +109,7 @@ module ProtonStream
         end
         
         # Write the bytes to the end of the queue
-        #puts "Writing #{BLOCK_SIZE} from track pos #{@@already_read} to buffer pos #{@@tail}"
+        #puts "Writing #{BLOCK_SIZE} from track pos #{already_read} to buffer pos #{@@tail}"
         buffer_file.write bytes
         
         # If we've reached the end of the buffer, wrap around to the front
@@ -119,7 +120,7 @@ module ProtonStream
         end
         
         # Remember how far into the track we have already read onto the queue
-        @@already_read += BLOCK_SIZE
+        self.already_read += BLOCK_SIZE
         
       rescue Exception => e
         puts e
@@ -154,8 +155,8 @@ module ProtonStream
     
     # Loads the next track and updates pointers
     def load_next_track
-      @@already_read = 0
-      current_track = Track.next_track(current_track._id)      
+      self.already_read = 0
+      self.current_track = Track.next_track(self.current_track._id)      
     end
     
     # Returns the number of blocks there are based on the bit rate
