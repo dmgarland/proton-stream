@@ -6,6 +6,7 @@ module ProtonStream
     include Singleton
     
     attr_accessor :buffer_file
+    attr_accessor :current_track
     
     BIT_RATE = 80
     BLOCK_SIZE = 1024 * BIT_RATE
@@ -16,7 +17,7 @@ module ProtonStream
     #
     def initialize
       self.buffer_file = File.new("/tmp/buffer", "w+")
-      @@current_track = Track.next_track
+      self.current_track = Track.next_track
       @@already_read = 0      
       @@head = 0
       @@tail = 0
@@ -46,10 +47,6 @@ module ProtonStream
       @@last_chunk
     end
     
-    def current_track
-      @@current_track
-    end
-    
     # ==========================================================================
     private
     
@@ -58,8 +55,8 @@ module ProtonStream
     def append_queue
       if free_space > 0        
         free_blocks.times {           
-          if @@already_read < @@current_track.file.size
-            buffer_block @@current_track
+          if @@already_read < current_track.file.size
+            buffer_block current_track
           else
             # We've finished this track, on to the next one
             load_next_track
@@ -158,7 +155,7 @@ module ProtonStream
     # Loads the next track and updates pointers
     def load_next_track
       @@already_read = 0
-      @@current_track = Track.next_track(@@current_track._id)      
+      current_track = Track.next_track(current_track._id)      
     end
     
     # Returns the number of blocks there are based on the bit rate
