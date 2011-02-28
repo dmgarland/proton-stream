@@ -8,6 +8,7 @@ module ProtonStream
     attr_accessor :buffer_file
     attr_accessor :current_track
     attr_accessor :already_read
+    attr_accessor :head
     
     BIT_RATE = 80
     BLOCK_SIZE = 1024 * BIT_RATE
@@ -20,7 +21,7 @@ module ProtonStream
       self.buffer_file = File.new("/tmp/buffer", "w+")
       self.current_track = Track.next_track
       self.already_read = 0      
-      @@head = 0
+      self.head = 0
       @@tail = 0
       
       # Fill the buffer to start off with
@@ -38,10 +39,6 @@ module ProtonStream
       end
       
       puts "Initialised queue: buffer max #{MAX_BUFFER_SIZE} #{BIT_RATE}kbs"
-    end
-    
-    def head
-      @@head
     end
     
     def last_chunk
@@ -74,15 +71,15 @@ module ProtonStream
     # without manipulting the pointers
     #
     def read_chunk
-      #puts("Reading #{BLOCK_SIZE} bytes from offset #{@@head}")
+      #puts("Reading #{BLOCK_SIZE} bytes from offset #{self.head}")
       
       # Read a block relative to the head pointer offset
-      @@last_chunk = File.read(buffer_file.path, BLOCK_SIZE, @@head)
-      @@head += BLOCK_SIZE
+      @@last_chunk = File.read(buffer_file.path, BLOCK_SIZE, self.head)
+      self.head += BLOCK_SIZE
       
       # If we've read to the end, loop around to the start
-      if @@head >= File.size(buffer_file)
-        @@head = 0
+      if self.head >= File.size(buffer_file)
+        self.head = 0
       end        
     end
     
@@ -141,12 +138,12 @@ module ProtonStream
         free_space = MAX_BUFFER_SIZE - buffer_file_size
       else
         # The free space is the difference between the tail and the head        
-        if @@head > @@tail
-          free_space = @@head - @@tail
-        elsif @@head == @@tail
+        if self.head > @@tail
+          free_space = self.head - @@tail
+        elsif self.head == @@tail
           free_space = 0
         else
-          free_space = (MAX_BUFFER_SIZE - @@tail) + @@head
+          free_space = (MAX_BUFFER_SIZE - @@tail) + self.head
         end
       end
       
