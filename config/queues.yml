@@ -1,0 +1,6 @@
+# Queues definition file A FileAudioQueue will be instantiated for each item on
+# on this queue
+- london
+- bristol
+#- brighton 
+#- etc etc  

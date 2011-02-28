@@ -51,14 +51,15 @@ class ProtonServer < Sinatra::Base
       
       # Create a singleton instance of a file-backed audio queue
       # which automatically starts buffering content
-      for scene in ["london", "brighton", "bristol"] do 
-        @@buffers[scene] = FileAudioQueue.new if @@buffers[scene].nil?
+      queues = YAML::load_file('config/queues.yml')
+      for q in queues do 
+        @@buffers[q] = FileAudioQueue.new if @@buffers[q].nil?
       end
     end
   end
   
-  get '/:scene/play.mp3' do    
-    buffer = @@buffers[params[:scene]]    
+  get '/:queue/play.mp3' do    
+    buffer = @@buffers[params[:queue]]    
     if buffer    
       EM.next_tick do
         request.env['async.callback'].call [200, @@mp3_mime_type, ResponseBody.new(buffer)]
