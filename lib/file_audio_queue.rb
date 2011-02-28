@@ -1,9 +1,6 @@
-require 'singleton'
-
 module ProtonStream
   
-  class FileAudioQueue
-    include Singleton
+  class FileAudioQueue  
     
     attr_accessor :buffer_file
     attr_accessor :current_track
@@ -20,7 +17,7 @@ module ProtonStream
     # appending bytes to the audio queue
     #
     def initialize
-      self.buffer_file = File.new("/tmp/buffer", "w+")
+      self.buffer_file = Tempfile.new("proton_stream.")
       self.current_track = Track.next_track
       self.already_read = 0      
       self.head = 0

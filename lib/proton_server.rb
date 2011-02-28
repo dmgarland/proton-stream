@@ -15,7 +15,7 @@ class ProtonServer < Sinatra::Base
   
   include ProtonStream
   
-  @@buffer = nil
+  @@buffers = {}
   @@keep_alive = [-1, {}, []].freeze
   @@ogg_mime_type = {'Content-Type' => 'application/ogg'}.freeze
   @@mp3_mime_type = {'Content-Type' => 'audio/mpeg'}.freeze
@@ -51,17 +51,22 @@ class ProtonServer < Sinatra::Base
       
       # Create a singleton instance of a file-backed audio queue
       # which automatically starts buffering content
-      @@buffer = FileAudioQueue.instance if @@buffer.nil?
+      for scene in ["london", "brighton", "bristol"] do 
+        @@buffers[scene] = FileAudioQueue.new if @@buffers[scene].nil?
+      end
     end
   end
   
-  get '/play.mp3' do
-    
-    EM.next_tick do
-      request.env['async.callback'].call [200, @@mp3_mime_type, ResponseBody.new]
-    end
-    
-    @@keep_alive    
+  get '/:scene/play.mp3' do    
+    buffer = @@buffers[params[:scene]]    
+    if buffer    
+      EM.next_tick do
+        request.env['async.callback'].call [200, @@mp3_mime_type, ResponseBody.new(buffer)]
+      end      
+      @@keep_alive
+    else
+      404
+    end      
   end
   
   get '/current_track.json' do

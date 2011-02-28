@@ -3,8 +3,10 @@ module ProtonStream
   class ResponseBody
     include EventMachine::Deferrable
     
-    def buffer 
-      @buffer ||= FileAudioQueue.instance
+    attr_accessor :buffer
+    
+    def initialize(buffer)
+      self.buffer = buffer
     end
     
     # Called by Rack to stream bytes 
