@@ -8,6 +8,7 @@ rescue Bundler::BundlerError => e
   exit e.status_code
 end
 require 'test/unit'
+require 'rack/test'
 require 'shoulda'
 require 'database_cleaner'
 require 'faker'
@@ -30,6 +31,10 @@ class Test::Unit::TestCase
   
   def teardown
     DatabaseCleaner.clean
+  end
+  
+  def app
+    ProtonServer.new
   end
   
   # Looks for a document in the files collection on the test database

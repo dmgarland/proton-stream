@@ -22,6 +22,14 @@ class TrackTest < Test::Unit::TestCase
       File.open(@file_name, "w+") { |f| f << "hi" * 100 }
     end
     
+    should "not validate the presence of a file by default" do
+      assert @track.valid?
+      # Turn on file validation
+      @track.validate_file = true
+      assert_equal false, @track.valid?
+      assert @track.errors.full_messages.include? "File can't be empty"
+    end
+    
     should "handle a track upload" do
       
       @track.file = File.new(@file_name)
@@ -35,7 +43,7 @@ class TrackTest < Test::Unit::TestCase
     end
     
     should "generate only relevant json" do
-      assert_equal "{\"title\":\"corporis neque dolorum\"}", @track.to_json
+      assert_equal "{\"title\":\"corporis neque dolorum\",\"id\":\"#{@track._id}\"}", @track.to_json
     end
     
     teardown do

@@ -4,6 +4,8 @@ require 'eventmachine'
 require 'mongo'
 require 'mongo_mapper'
 require 'joint'
+require 'erb'
+require File.dirname(__FILE__) +  '/ext/partials'
 
 require 'lib/file_audio_queue'
 require 'lib/response_body'
@@ -17,7 +19,16 @@ class ProtonServer < Sinatra::Base
   @@keep_alive = [-1, {}, []].freeze
   @@ogg_mime_type = {'Content-Type' => 'application/ogg'}.freeze
   @@mp3_mime_type = {'Content-Type' => 'audio/mpeg'}.freeze
-  @@html_mime_type = {'Content-Type' => 'text/html'}.freeze 
+  @@html_mime_type = {'Content-Type' => 'text/html'}.freeze
+  
+  set :views, File.dirname(__FILE__) + '/proton-stream/views'
+  
+  # Register helpers
+  #
+  helpers do
+    include Sinatra::Partials
+    alias_method :h, :escape_html
+  end
   
   # Reload app classes and templates in development
   configure(:development) do
@@ -57,5 +68,5 @@ class ProtonServer < Sinatra::Base
     content_type :json
     @@buffer.current_track.to_json
   end
-  
+
 end

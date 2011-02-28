@@ -2,10 +2,17 @@ class Track
   include MongoMapper::Document
   plugin Joint
   
+  key :uuid,      String
   key :title,     String
-  key :random,    Integer  
+  key :random,    Integer, :default => Proc.new { rand(100000) }
   attachment :file
   timestamps!
+  
+  attr_accessor :validate_file
+  attr_accessor :disable_validation
+  validates_presence_of :file, :if => Proc.new { |o| o.validate_file }
+  validates_presence_of :title, :if => Proc.new { |o| !o.disable_validation }
+  validates_presence_of :random, :if => Proc.new { |o| !o.disable_validation }
   
   def self.next_track(current_id = nil)
     # Random
@@ -17,8 +24,10 @@ class Track
   
   def to_json(*a)
     { 
+      :id => id,
       :title => title 
     }.to_json(*a)
   end
   
 end
+

@@ -24,4 +24,5 @@ group :development do
   gem "faker"
   gem "machinist_mongo"
   gem "database_cleaner"
+  gem "rack-test"
 end
