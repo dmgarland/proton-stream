@@ -70,9 +70,14 @@ class ProtonServer < Sinatra::Base
     end      
   end
   
-  get '/current_track.json' do
-    content_type :json
-    @@buffer.current_track.to_json
+  get '/:queue/current_track.json' do
+    buffer = @@buffers[params[:queue]]    
+    if buffer
+      content_type :json
+      buffer.current_track.to_json
+    else
+      404
+    end
   end
 
 end
